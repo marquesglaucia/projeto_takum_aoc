@@ -1,41 +1,57 @@
 #ifndef TAKUM_DECODER_H
 #define TAKUM_DECODER_H
-
+// Takum linear (Hunhold) - T8/T16/T32.
+// Layout (n bits): S | D | R(3) | C(r bits) | M(p bits),  p = n-5-r
+//   r = D ? R : 7-R
+//   c = D ? 2^r-1 + C : -2^(r+1)+1 + C        (C truncado => completado com zeros)
+//   f = M / 2^p
+// 000...0 = zero ; 100...0 = NaR
 #include <cstdint>
 
-// ==========================================
-// 1. A Estrutura de Dados Takum
-// ==========================================
+enum class TakumKind : uint8_t { ZERO, NAR, NORMAL };
+
+// Campos extraidos (Fase 1, item 1)
 struct TakumFormat {
-    uint8_t sinal;         // S
-    uint8_t direcao;       // D
-    uint8_t regime;        // R
-    int valor_k;           // Guarda o valor matemático do regime (escala)
-    uint8_t caracteristica;// C
-    uint32_t fracao;       // F
+    TakumKind tipo;
+    int       n;               // largura (8, 16 ou 32)
+    uint8_t   sinal;           // S
+    uint8_t   direcao;         // D
+    uint8_t   regime;          // R (3 bits brutos, 0..7)
+    int       valor_k;         // r = nº de bits da caracteristica
+    uint8_t   bits_C;          // C bruto (ja completado com zeros se truncado)
+    int       caracteristica;  // c com sinal, em [-255, 254]
+    uint32_t  fracao;          // M bruto
+    int       bits_fracao;     // p
 };
 
-// ==========================================
-// 2. Funções de Decodificação (Bits -> Estrutura)
-// Exigência da Fase 1 para tamanhos T8, T16 e T32
-// ==========================================
-TakumFormat decodificar_T8(uint8_t bits_entrada);
-TakumFormat decodificar_T16(uint16_t bits_entrada);
-TakumFormat decodificar_T32(uint32_t bits_entrada);
+TakumFormat decodificar_T8 (uint8_t  bits);
+TakumFormat decodificar_T16(uint16_t bits);
+TakumFormat decodificar_T32(uint32_t bits);
 
-// ==========================================
-// 3. Funções de Codificação Inversa (Estrutura -> Bits)
-// Necessárias para guardar o resultado de volta no processador
-// ==========================================
-uint8_t codificar_T8(TakumFormat valor_calculado);
-uint16_t codificar_T16(TakumFormat valor_calculado);
-uint32_t codificar_T32(TakumFormat valor_calculado);
+// Estrutura -> bits (reencoda exatamente o que decodificar_* produziu)
+uint8_t  codificar_T8 (const TakumFormat& t);
+uint16_t codificar_T16(const TakumFormat& t);
+uint32_t codificar_T32(const TakumFormat& t);
 
-// ==========================================
-// 4. Operações Aritméticas Fundamentais
-// ==========================================
-TakumFormat takum_adicao(TakumFormat operadorA, TakumFormat operadorB);
-TakumFormat takum_subtracao(TakumFormat operadorA, TakumFormat operadorB);
-TakumFormat takum_multiplicacao(TakumFormat operadorA, TakumFormat operadorB);
+// Aritmetica (Fase 1, item 2): operam em padroes de bits, arredondamento
+// para o mais proximo (empate -> par), saturando (nunca overflow p/ NaR, nunca underflow p/ 0).
+uint32_t takum_add(uint32_t a, uint32_t b, int n);
+uint32_t takum_sub(uint32_t a, uint32_t b, int n);
+uint32_t takum_mul(uint32_t a, uint32_t b, int n);
+uint32_t takum_cvt(uint32_t a, int n_from, int n_to);   // base do vncvt.t.t / vwcvt
 
-#endif // TAKUM_DECODER_H
+uint8_t  takum_adicao_T8 (uint8_t a, uint8_t b);
+uint16_t takum_adicao_T16(uint16_t a, uint16_t b);
+uint32_t takum_adicao_T32(uint32_t a, uint32_t b);
+uint8_t  takum_subtracao_T8 (uint8_t a, uint8_t b);
+uint16_t takum_subtracao_T16(uint16_t a, uint16_t b);
+uint32_t takum_subtracao_T32(uint32_t a, uint32_t b);
+uint8_t  takum_multiplicacao_T8 (uint8_t a, uint8_t b);
+uint16_t takum_multiplicacao_T16(uint16_t a, uint16_t b);
+uint32_t takum_multiplicacao_T32(uint32_t a, uint32_t b);
+
+// Utilitarios para testes / experimentos de erro relativo
+long double takum_to_ld(uint32_t bits, int n);
+uint32_t    takum_from_ld(long double x, int n);
+
+#endif
