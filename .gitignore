@@ -1,2 +1,15 @@
 riscv-isa-sim/build/
+
+# Artefatos de build
+lib/
+test_takum
+main
+*.o
+*.a
+
+# Python
 __pycache__/
+*.pyc
+
+# Editor
+.vscode/
