@@ -18,6 +18,7 @@
 #include "../fesvr/memif.h"
 #include "vector_unit.h"
 #include "imsic.h"
+#include <bitset>
 
 #define FIRST_HPMCOUNTER 3
 #define N_HPMCOUNTERS 29
