@@ -1,8 +1,5 @@
 # Decisões de projeto
 
-> A completar pelo grupo: layout, arredondamento, saturação e valores especiais das operações
-> já existentes (decodificação, soma, subtração, multiplicação).
-
 ## Divisão (`takum_div`, `takum_divisao_T8/T16/T32`)
 - **Arredondamento:** ao mais próximo, empate para par. Usa a mesma rotina de codificação (`pack`)
   da soma e da multiplicação; o resto da divisão inteira das mantissas entra como bit *sticky*.
