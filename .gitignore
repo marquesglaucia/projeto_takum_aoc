@@ -3,6 +3,7 @@ riscv-isa-sim/build/
 # Artefatos de build
 lib/
 test_takum
+test_integracao
 main
 *.o
 *.a

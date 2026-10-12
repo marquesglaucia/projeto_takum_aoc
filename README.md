@@ -43,20 +43,34 @@ make test LIBTAKUM=third_party/libtakum
 Saída esperada (termina assim):
 ```
 [decode/encode] falhas ate aqui: 0
-[T8 exaustivo, 196608 ops] falhas: 0
-[T16 aleatorio, 9M ops] falhas: 0
-[T32 aleatorio, 9M ops] falhas: 0
+[T8 exaustivo, 262144 ops] falhas: 0
+[T16 aleatorio, 12M ops] falhas: 0
+[T32 aleatorio, 12M ops] falhas: 0
 RESULTADO: TUDO OK (0)
 ```
 Em caso de falha, o programa imprime até 15 casos (bits de entrada, resultado
 obtido e resultado da referência). O teste leva alguns segundos na nossa máquina.
 
+## Como rodar a integração numérica
+Na raiz do projeto (não depende da libtakum):
+```bash
+make integracao
+```
+
+Imprime um autoteste da aritmética (soma, multiplicação, divisão e negação em T8/T16/T32),
+uma tabela de erro relativo de cada método de integração (ponto médio, trapézio, Simpson 1/3 e 3/8,
+Gauss-Legendre 2/3/5 pontos, Romberg e Simpson adaptativo) em T8, T16, float, T32, double e
+long double para 7 integrais de teste, e a comparação entre soma ingênua e soma de Kahan.
+
 ## Estrutura do repositório
 | Caminho | O que é |
 |---|---|
 | `takum_decoder.h/.cpp` | Decodificação, codificação e aritmética Takum |
-| `test_takum.cpp` | Testes contra a libtakum |
-| `Makefile` | Compila a libtakum e roda os testes |
+| `test_takum.cpp` | Testes contra a libtakum (soma, subtração, multiplicação e divisão) |
+| `takum_tipo.h` | Tipo `Takum<N>` (`T8`/`T16`/`T32`) com operadores `+ - * /` |
+| `takum_integracao.h` | Métodos de integração numérica (templates: rodam em takum e IEEE) |
+| `test_integracao.cpp` | Compara as integrais em takum e IEEE (`make integracao`) |
+| `Makefile` | Compila a libtakum e roda os testes (`make test`, `make integracao`) |
 | `third_party/libtakum` | Submódulo, usado **somente como oráculo de teste** |
 | `riscv-isa-sim/` | <descrever: simulador e o que foi modificado> |
 | `avaliacao_takum.py` | <descrever: o que gera, como rodar> |
@@ -68,6 +82,7 @@ Exemplo mínimo (decodificar e somar em T16):
 #include "takum_decoder.h"
 uint16_t a = takum_from_ld(1.5L, 16), b = takum_from_ld(2.25L, 16);
 long double s = takum_to_ld(takum_adicao_T16(a, b), 16);   // 3.75
+long double q = takum_to_ld(takum_divisao_T16(a, b), 16);  // ~0.6667
 ```
 Compilar com: `g++ -O2 -std=c++17 main.cpp takum_decoder.cpp -o main`
 
