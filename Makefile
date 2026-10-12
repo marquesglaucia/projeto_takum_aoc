@@ -6,3 +6,9 @@ lib/libtakum.a:
 	mkdir -p lib && for f in $(LIBTAKUM)/src/*.c; do gcc -O2 -std=c99 -c $$f -o lib/$$(basename $$f .c).o; done && ar rcs $@ lib/*.o
 test: lib/libtakum.a
 	$(CXX) $(CXXFLAGS) -I$(LIBTAKUM) test_takum.cpp takum_decoder.cpp lib/libtakum.a -lm -o test_takum && ./test_takum
+
+# Integracao numerica em takum (T8/T16/T32) x IEEE. Uso: make integracao
+integracao: test_integracao.cpp takum_decoder.cpp takum_decoder.h takum_tipo.h takum_integracao.h
+	$(CXX) $(CXXFLAGS) test_integracao.cpp takum_decoder.cpp -o test_integracao && ./test_integracao
+
+.PHONY: test integracao

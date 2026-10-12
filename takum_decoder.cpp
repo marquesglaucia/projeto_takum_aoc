@@ -104,6 +104,25 @@ uint32_t takum_mul(uint32_t a, uint32_t b, int n) {
     return pack(x.s ^ y.s, h, mant, st, n);
 }
 
+// divisao: x/y com x.mant, y.mant em [2^63, 2^64) -> Q = (x.mant << 64) / y.mant em (2^63, 2^65)
+uint32_t takum_div(uint32_t a, uint32_t b, int n) {
+    Unp x = unpack(a, n), y = unpack(b, n);
+    if (x.k == TakumKind::NAR || y.k == TakumKind::NAR) return 1u << (n - 1);
+    if (y.k == TakumKind::ZERO) return 1u << (n - 1);   // x/0 = NaR
+    if (x.k == TakumKind::ZERO) return 0;
+    u128 N = (u128)x.mant << 64;
+    u128 Q = N / y.mant, R = N % y.mant;
+    int h = x.h - y.h; uint64_t mant; bool st = R != 0;
+    if (Q >> 64) { mant = (uint64_t)(Q >> 1); st = st || (Q & 1); }
+    else         { mant = (uint64_t)Q; h -= 1; }
+    return pack(x.s ^ y.s, h, mant, st, n);
+}
+
+uint32_t takum_neg(uint32_t a, int n) {
+    // em takum a negacao e o complemento de dois (exata); 0 e NaR sao fixos
+    return (0u - a) & mask_n(n);
+}
+
 static uint32_t add_unp(Unp x, Unp y, int n) {
     if (x.k == TakumKind::NAR || y.k == TakumKind::NAR) return 1u << (n - 1);
     if (x.k == TakumKind::ZERO) return pack_u(y, n);
@@ -144,6 +163,9 @@ uint32_t takum_subtracao_T32(uint32_t a, uint32_t b) { return takum_sub(a, b, 32
 uint8_t  takum_multiplicacao_T8 (uint8_t a, uint8_t b)   { return (uint8_t) takum_mul(a, b, 8);  }
 uint16_t takum_multiplicacao_T16(uint16_t a, uint16_t b) { return (uint16_t)takum_mul(a, b, 16); }
 uint32_t takum_multiplicacao_T32(uint32_t a, uint32_t b) { return takum_mul(a, b, 32); }
+uint8_t  takum_divisao_T8 (uint8_t a, uint8_t b)   { return (uint8_t) takum_div(a, b, 8);  }
+uint16_t takum_divisao_T16(uint16_t a, uint16_t b) { return (uint16_t)takum_div(a, b, 16); }
+uint32_t takum_divisao_T32(uint32_t a, uint32_t b) { return takum_div(a, b, 32); }
 
 // ---------------------------------------------------------------- conversao p/ long double (testes)
 long double takum_to_ld(uint32_t bits, int n) {
@@ -160,4 +182,11 @@ uint32_t takum_from_ld(long double x, int n) {
     int e; long double g = frexpl(x, &e);            // g em [0.5,1)
     uint64_t mant = (uint64_t)ldexpl(g, 64);         // bit 63 = 1
     return pack(s, e - 1, mant, false, n);
+}
+uint32_t takum_from_int(long long k, int n) {
+    if (k == 0) return 0;
+    int s = k < 0;
+    uint64_t v = s ? (uint64_t)0 - (uint64_t)k : (uint64_t)k;
+    int msb = 63 - __builtin_clzll(v);
+    return pack(s, msb, v << (63 - msb), false, n);
 }

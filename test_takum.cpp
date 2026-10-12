@@ -36,10 +36,11 @@ int main() {
     // 2) aritmetica vs libtakum
     int f0 = falhas; long total = 0;
     for (uint32_t a = 0; a < 256; a++) for (uint32_t b = 0; b < 256; b++) {
-        total += 3;
+        total += 4;
         CHECK(takum_adicao_T8(a,b)==(uint8_t)takum8_addition(a,b), "add8 %02x %02x me=%02x ref=%02x", a,b,takum_adicao_T8(a,b),(uint8_t)takum8_addition(a,b));
         CHECK(takum_subtracao_T8(a,b)==(uint8_t)takum8_subtraction(a,b), "sub8 %02x %02x me=%02x ref=%02x", a,b,takum_subtracao_T8(a,b),(uint8_t)takum8_subtraction(a,b));
         CHECK(takum_multiplicacao_T8(a,b)==(uint8_t)takum8_multiplication(a,b), "mul8 %02x %02x me=%02x ref=%02x", a,b,takum_multiplicacao_T8(a,b),(uint8_t)takum8_multiplication(a,b));
+        CHECK(takum_divisao_T8(a,b)==(uint8_t)takum8_division(a,b), "div8 %02x %02x me=%02x ref=%02x", a,b,takum_divisao_T8(a,b),(uint8_t)takum8_division(a,b));
     }
     printf("[T8 exaustivo, %ld ops] falhas: %d\n", total, falhas - f0); f0 = falhas;
     for (int i = 0; i < 3000000; i++) {
@@ -47,15 +48,17 @@ int main() {
         CHECK(takum_adicao_T16(a,b)==(uint16_t)takum16_addition(a,b), "add16 %04x %04x me=%04x ref=%04x", a,b,takum_adicao_T16(a,b),(uint16_t)takum16_addition(a,b));
         CHECK(takum_subtracao_T16(a,b)==(uint16_t)takum16_subtraction(a,b), "sub16 %04x %04x me=%04x ref=%04x", a,b,takum_subtracao_T16(a,b),(uint16_t)takum16_subtraction(a,b));
         CHECK(takum_multiplicacao_T16(a,b)==(uint16_t)takum16_multiplication(a,b), "mul16 %04x %04x me=%04x ref=%04x", a,b,takum_multiplicacao_T16(a,b),(uint16_t)takum16_multiplication(a,b));
+        CHECK(takum_divisao_T16(a,b)==(uint16_t)takum16_division(a,b), "div16 %04x %04x me=%04x ref=%04x", a,b,takum_divisao_T16(a,b),(uint16_t)takum16_division(a,b));
     }
-    printf("[T16 aleatorio, 9M ops] falhas: %d\n", falhas - f0); f0 = falhas;
+    printf("[T16 aleatorio, 12M ops] falhas: %d\n", falhas - f0); f0 = falhas;
     for (int i = 0; i < 3000000; i++) {
         uint32_t a = rng(), b = rng();
         CHECK(takum_adicao_T32(a,b)==(uint32_t)takum32_addition(a,b), "add32 %08x %08x me=%08x ref=%08x", a,b,takum_adicao_T32(a,b),(uint32_t)takum32_addition(a,b));
         CHECK(takum_subtracao_T32(a,b)==(uint32_t)takum32_subtraction(a,b), "sub32 %08x %08x me=%08x ref=%08x", a,b,takum_subtracao_T32(a,b),(uint32_t)takum32_subtraction(a,b));
         CHECK(takum_multiplicacao_T32(a,b)==(uint32_t)takum32_multiplication(a,b), "mul32 %08x %08x me=%08x ref=%08x", a,b,takum_multiplicacao_T32(a,b),(uint32_t)takum32_multiplication(a,b));
+        CHECK(takum_divisao_T32(a,b)==(uint32_t)takum32_division(a,b), "div32 %08x %08x me=%08x ref=%08x", a,b,takum_divisao_T32(a,b),(uint32_t)takum32_division(a,b));
     }
-    printf("[T32 aleatorio, 9M ops] falhas: %d\n", falhas - f0);
+    printf("[T32 aleatorio, 12M ops] falhas: %d\n", falhas - f0);
 
     // --- TESTES DE CASOS EXTREMOS (EDGE CASES) EM T32 ---
     uint32_t zero = 0x00000000;
@@ -72,6 +75,12 @@ int main() {
 
     // 3. O Teste Supremo da Subtração: Cancelamento Exato (X - X = 0)
     CHECK(takum_subtracao_T32(val1, val1) == zero, "Falha: Subtracao de valores iguais deve resultar no Zero exato");
+
+    // 4. Divisao: x/0 = NaR, NaR propaga, 0/x = 0, x/x = 1
+    CHECK(takum_divisao_T32(val1, zero) == nar, "Falha: Div por Zero deve resultar em NaR");
+    CHECK(takum_divisao_T32(nar, val1) == nar, "Falha: Div com NaR deve propagar NaR");
+    CHECK(takum_divisao_T32(zero, val1) == zero, "Falha: Zero dividido por x deve ser Zero");
+    CHECK(takum_divisao_T32(val1, val1) == takum_from_ld(1.0L, 32), "Falha: x/x deve ser 1");
 
     printf(falhas ? "RESULTADO: %d FALHAS\n" : "RESULTADO: TUDO OK (%d)\n", falhas);
     return falhas != 0;

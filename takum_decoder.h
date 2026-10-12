@@ -38,6 +38,8 @@ uint32_t codificar_T32(const TakumFormat& t);
 uint32_t takum_add(uint32_t a, uint32_t b, int n);
 uint32_t takum_sub(uint32_t a, uint32_t b, int n);
 uint32_t takum_mul(uint32_t a, uint32_t b, int n);
+uint32_t takum_div(uint32_t a, uint32_t b, int n);       // x/0 = NaR
+uint32_t takum_neg(uint32_t a, int n);                   // complemento de dois (exata)
 uint32_t takum_cvt(uint32_t a, int n_from, int n_to);   // base do vncvt.t.t / vwcvt
 
 uint8_t  takum_adicao_T8 (uint8_t a, uint8_t b);
@@ -49,9 +51,13 @@ uint32_t takum_subtracao_T32(uint32_t a, uint32_t b);
 uint8_t  takum_multiplicacao_T8 (uint8_t a, uint8_t b);
 uint16_t takum_multiplicacao_T16(uint16_t a, uint16_t b);
 uint32_t takum_multiplicacao_T32(uint32_t a, uint32_t b);
+uint8_t  takum_divisao_T8 (uint8_t a, uint8_t b);
+uint16_t takum_divisao_T16(uint16_t a, uint16_t b);
+uint32_t takum_divisao_T32(uint32_t a, uint32_t b);
 
 // Utilitarios para testes / experimentos de erro relativo
 long double takum_to_ld(uint32_t bits, int n);
 uint32_t    takum_from_ld(long double x, int n);
+uint32_t    takum_from_int(long long k, int n);           // inteiro -> takum (arredondado)
 
 #endif
