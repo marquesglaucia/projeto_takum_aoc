@@ -1,5 +1,8 @@
 #include "takum_decoder.h"
 #include <cmath>
+#include <cfloat>
+
+static_assert(LDBL_MANT_DIG >= 64, "takum_dot/takum_to_ld exigem long double de 64 bits de mantissa (x86/x86-64)");
 
 typedef unsigned __int128 u128;
 
@@ -189,4 +192,43 @@ uint32_t takum_from_int(long long k, int n) {
     uint64_t v = s ? (uint64_t)0 - (uint64_t)k : (uint64_t)k;
     int msb = 63 - __builtin_clzll(v);
     return pack(s, msb, v << (63 - msb), false, n);
+}
+
+// ---------------------------------------------------------------- vtdot: produto escalar com acumulo ampliado
+TakumAcc takum_acc_init(uint32_t init_bits, int n) {
+    TakumAcc a{0.0L, false};
+    long double x = takum_to_ld(init_bits, n);     // zero -> 0, NaR -> NaN
+    if (std::isnan(x)) a.nar = true; else a.v = x;
+    return a;
+}
+void takum_acc_fma(TakumAcc& acc, uint32_t a, uint32_t b, int n) {
+    long double x = takum_to_ld(a, n), y = takum_to_ld(b, n);
+    if (std::isnan(x) || std::isnan(y)) { acc.nar = true; return; }
+    if (acc.nar) return;
+    long double p = x * y;      // exato: <= 56 bits significativos < 64
+    acc.v += p;                 // 1 arredondamento (64 bits, nearest-even)
+}
+uint32_t takum_acc_result(const TakumAcc& acc, int n) {
+    if (acc.nar) return 1u << (n - 1);
+    return takum_from_ld(acc.v, n);                // unico arredondamento p/ n bits
+}
+uint32_t takum_dot(const uint32_t* a, const uint32_t* b, size_t len, uint32_t acc_init, int n) {
+    TakumAcc acc = takum_acc_init(acc_init, n);
+    for (size_t i = 0; i < len; i++) takum_acc_fma(acc, a[i], b[i], n);
+    return takum_acc_result(acc, n);
+}
+uint8_t  takum_dot_T8 (const uint8_t*  a, const uint8_t*  b, size_t len, uint8_t  acc_init) {
+    TakumAcc acc = takum_acc_init(acc_init, 8);
+    for (size_t i = 0; i < len; i++) takum_acc_fma(acc, a[i], b[i], 8);
+    return (uint8_t)takum_acc_result(acc, 8);
+}
+uint16_t takum_dot_T16(const uint16_t* a, const uint16_t* b, size_t len, uint16_t acc_init) {
+    TakumAcc acc = takum_acc_init(acc_init, 16);
+    for (size_t i = 0; i < len; i++) takum_acc_fma(acc, a[i], b[i], 16);
+    return (uint16_t)takum_acc_result(acc, 16);
+}
+uint32_t takum_dot_T32(const uint32_t* a, const uint32_t* b, size_t len, uint32_t acc_init) {
+    TakumAcc acc = takum_acc_init(acc_init, 32);
+    for (size_t i = 0; i < len; i++) takum_acc_fma(acc, a[i], b[i], 32);
+    return takum_acc_result(acc, 32);
 }

@@ -52,6 +52,24 @@ struct Takum {
     friend Takum atan(Takum a) { return Takum(atanl(a.ld())); }
 };
 
+
+// ---- produto escalar com acumulo ampliado (vtdot.vv) -----------------------------------
+// dot: um unico arredondamento no fim (como um vtdot com vl = len).
+template<int N>
+Takum<N> dot(const Takum<N>* x, const Takum<N>* y, size_t len, Takum<N> init = Takum<N>()) {
+    TakumAcc acc = takum_acc_init(init.bits, N);
+    for (size_t i = 0; i < len; i++) takum_acc_fma(acc, x[i].bits, y[i].bits, N);
+    return Takum<N>::raw(takum_acc_result(acc, N));
+}
+// dot_strips: modela o strip-mining do RVV. Cada vtdot processa no maximo `vl` elementos
+// e grava o parcial em vd[0] (arredondado p/ N bits) antes da proxima iteracao.
+template<int N>
+Takum<N> dot_strips(const Takum<N>* x, const Takum<N>* y, size_t len, size_t vl, Takum<N> init = Takum<N>()) {
+    Takum<N> r = init;
+    for (size_t i = 0; i < len; i += vl) r = dot<N>(x + i, y + i, (len - i < vl ? len - i : vl), r);
+    return r;
+}
+
 typedef Takum<8>  T8;
 typedef Takum<16> T16;
 typedef Takum<32> T32;
