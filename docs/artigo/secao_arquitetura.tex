@@ -1,0 +1,84 @@
+% Seção "Proposed Architecture" (Rafael). Incluir no artigo com \input{secao_arquitetura}.
+% Requer: \usepackage{graphicx,booktabs,amsmath,tikz}  (template IEEEtran)
+\section{Proposed Architecture}
+\label{sec:arch}
+
+We implemented the Takum datapath as a bit-exact C++ functional model and integrated
+it into the Spike RISC-V ISA simulator as the \emph{Zvtakum} vector extension. The
+simulator was chosen over an RTL description because it allowed us to validate
+millions of operations against a reference library and to reuse the \emph{same} source
+file inside the ISA simulator, so no second copy of the arithmetic exists.
+
+\subsection{Format and Decoder}
+We use the linear takum of Hunhold~\cite{hunhold2024takum} with $n\in\{8,16,32\}$ bits:
+\begin{equation}
+\underbrace{S}_{1}\,\underbrace{D}_{1}\,\underbrace{R}_{3}\,\underbrace{C}_{r}\,\underbrace{M}_{p},
+\qquad r = D\,?\,R : 7-R,\quad p = n-5-r .
+\end{equation}
+The regime field has a fixed width of three bits, so the number of characteristic
+bits $r$ is known after reading only the first five bits ($S$, $D$, $R$). This is the
+property that gives takums a decoder whose front end is common to all widths~\cite{hunhold2025avx}.
+The characteristic is $c = 2^r-1+C$ for $D=1$ and $c=-2^{r+1}+1+C$ for $D=0$, and the
+mantissa is $1.f$ with $f=M/2^p$. In T8 the characteristic may not fit in the
+remaining bits; it is then truncated and completed with zeros. The all-zero pattern is the
+only zero and $10\ldots0$ is the only NaR (not-a-real); there are no infinities and no NaN payloads.
+
+The decoder is organised in two layers: (i)~field extraction (S, D, R, C, M and the derived $r$, $c$, $p$),
+and (ii)~an internal triple (sign, exponent, 64-bit significand) on which the ALU operates.
+
+\subsection{Arithmetic Unit}
+Addition, subtraction, multiplication and division share a single encoder. The product of two
+significands is computed exactly in 128 bits; the adder aligns exponents in 128 bits with
+62 guard bits plus a sticky bit, and subtraction renormalises by the leading one after cancellation.
+Results are rounded to nearest, ties to even, on the bit string $(D\,R\,C\,M)$, which
+is what the reference library does, and they saturate: overflow never produces NaR and
+underflow never produces zero. NaR propagates through every operation.
+Because every operation acts on bit patterns, width conversion (\texttt{vncvt.t.t}) reduces to the
+encoder's rounding step. Rounding has a single mode and there are no exception flags;
+this is the basis of the CSR analysis in Section~\ref{sec:results}.
+
+\subsection{The Zvtakum Extension}
+Zvtakum adds five instructions (Table~\ref{tab:zvt}) that operate on elements whose width equals
+\texttt{SEW}, reusing \texttt{vl}, \texttt{vstart}, the mask bit and register grouping of
+the standard vector extension. SEW$=64$ is illegal because the project has no T64.
+The instructions are placed in the \emph{custom-1} opcode space (\texttt{0x2b}) with the OP-V field layout, because the
+reserved OP-V slots belong to RISC-V International.
+
+\begin{table}[t]
+\caption{Zvtakum instructions (opcode \texttt{0x2b}, \texttt{funct3}$=000$).}
+\label{tab:zvt}
+\centering
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Instruction & \texttt{funct6} & Semantics \\
+\midrule
+\texttt{vtadd.vv}  & 000000 & $vd_i = vs2_i + vs1_i$ \\
+\texttt{vtsub.vv}  & 000001 & $vd_i = vs2_i - vs1_i$ \\
+\texttt{vtmul.vv}  & 000010 & $vd_i = vs2_i \cdot vs1_i$ \\
+\texttt{vtdot.vv}  & 000011 & $vd_0 = \mathrm{RN}(vd_0+\sum_i vs2_i\,vs1_i)$ \\
+\texttt{vncvt.t.t} & 000100 & $vd_i=\mathrm{RN}_{SEW}(vs2_i)$, $vs2$ is $2\!\cdot\!$SEW \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Operand order.} \texttt{vtsub} computes $vs2-vs1$, like \texttt{vfsub.vv}.
+
+\textbf{Dot product.} \texttt{vtdot.vv} is a reduction: \texttt{vd} is an accumulator (as in \texttt{vmacc}), only
+element~0 is read and written, and the instruction requires \texttt{vstart}$=0$. Each product is exact (at most 56
+significand bits) and is added to an accumulator with a 64-bit significand, more than twice the 27 fraction bits of T32;
+only one rounding to SEW bits happens at the end. We considered two alternatives. A widened destination
+(T8$\rightarrow$T16, T16$\rightarrow$T32) is not uniform because T32 would need a T64. An exact accumulator (quire, about
+1.2\,kbit) is more faithful but far more expensive in hardware. Our choice is uniform across widths; its cost is that a cancellation of more
+than $\approx$64 bits loses the residual, which only happens with extreme dynamic range (random T8 bit patterns).
+In strip-mined loops each \texttt{vtdot} stores a partial result rounded to SEW bits, and our experiments model exactly this behaviour.
+
+\subsection{Simulator Integration and Validation}
+In Spike, the five instructions are implemented as \texttt{insns/*.h} files that call the project's decoder
+through a thin glue unit. They are registered in \texttt{encoding.h}, in the build list and in the
+disassembler, so traces show them by name. Validation has three layers:
+(i)~decode/encode and $+,-,\times,\div$ against \texttt{libtakum}, exhaustively in T8 and with $12$~M random operations each in T16 and T32 (0 mismatches);
+(ii)~\texttt{takum\_dot} against \texttt{\_\_float128} and, bit by bit, against an independent Python model with exact rationals (11{,}643 cases, 0 mismatches);
+(iii)~a bare-metal program run in Spike with \texttt{--isa=rv64gv} that executes the five instructions with full and partial \texttt{vl}, masks, NaR, zero,
+SEW$=8/16/32$ and register groups, and compares with the expected values (22 instruction tests pass; a negative control with corrupted
+expected values fails as it should).
