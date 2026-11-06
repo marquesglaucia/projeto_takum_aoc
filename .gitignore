@@ -13,4 +13,11 @@ __pycache__/
 *.pyc
 
 # Editor
-.vscode/
+.vscode/dot_vectors.txt
+test_dot
+test_integracao
+spike_test/gera_dados
+spike_test/test_data.h
+spike_test/test_spike.elf
+spike_test/trace.txt
+teste
