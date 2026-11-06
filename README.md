@@ -70,7 +70,12 @@ long double para 7 integrais de teste, e a comparação entre soma ingênua e so
 | `takum_tipo.h` | Tipo `Takum<N>` (`T8`/`T16`/`T32`) com operadores `+ - * /` |
 | `takum_integracao.h` | Métodos de integração numérica (templates: rodam em takum e IEEE) |
 | `test_integracao.cpp` | Compara as integrais em takum e IEEE (`make integracao`) |
-| `Makefile` | Compila a libtakum e roda os testes (`make test`, `make integracao`) |
+| `Makefile` | `make test`, `make integracao`, `make dot`, `make spike-test`, `make demo` |
+| `test_dot.cpp`, `verifica_dot.py` | Validação do `takum_dot` (vtdot) vs `__float128` e modelo Python exato |
+| `spike_test/` | Programa bare-metal que executa as 5 instruções Zvtakum no Spike |
+| `docs/ZVTAKUM.md`, `docs/SPIKE.md`, `docs/DEMO.md` | Especificação da ISA, alterações no Spike, roteiro da demo e plano B |
+| `docs/artigo/secao_arquitetura.tex` | Seção "Proposed Architecture" do artigo |
+| `docs/slides/` | Slides de arquitetura/ISA (`gen.py` gera o `.pptx`) |
 | `third_party/libtakum` | Submódulo, usado **somente como oráculo de teste** |
 | `riscv-isa-sim/` | <descrever: simulador e o que foi modificado> |
 | `avaliacao_takum.py` | <descrever: o que gera, como rodar> |
