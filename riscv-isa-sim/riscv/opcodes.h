@@ -272,5 +272,3 @@ CSR_IMM_INSNS_LIST(DEFINE_CSR_IMM_INSN)
 inline std::uint32_t ebreak(void) {
   return MATCH_EBREAK;
 }
-#define MATCH_VTSUB_VV 0x84001057
-#define MASK_VTSUB_VV  0xfc00707f

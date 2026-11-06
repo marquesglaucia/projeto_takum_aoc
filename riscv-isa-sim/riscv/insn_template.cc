@@ -2,6 +2,7 @@
 
 #include "insn_template.h"
 #include "insn_macros.h"
+#include "takum_glue.h"   // Zvtakum (projeto Takum-RVV)
 
 #define DECODE_MACRO_USAGE_LOGGED 0
 

@@ -1973,6 +1973,11 @@ void disassembler_t::add_instructions(const isa_parser_t* isa, bool strict)
     DISASM_INSN("vmv.s.x", vmv_s_x, 0, {&vd, &xrs1});
 
     //VXUNARY0
+    DEFINE_VECTOR_VV(vtadd_vv);
+    DEFINE_VECTOR_VV(vtsub_vv);
+    DEFINE_VECTOR_VV(vtmul_vv);
+    DEFINE_VECTOR_VV(vtdot_vv);
+    DEFINE_VECTOR_V(vncvt_t_t);
     DEFINE_VECTOR_V(vzext_vf2);
     DEFINE_VECTOR_V(vsext_vf2);
     DEFINE_VECTOR_V(vzext_vf4);

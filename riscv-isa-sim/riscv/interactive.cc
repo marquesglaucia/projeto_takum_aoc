@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "sim.h"
+#include "socketif.h"   // antes de decode_macros.h: a macro yield() colide com o Boost >= 1.83
 #include "decode.h"
 #include "decode_macros.h"
 #include "disasm.h"

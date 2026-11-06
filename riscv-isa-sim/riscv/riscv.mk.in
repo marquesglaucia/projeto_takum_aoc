@@ -54,6 +54,7 @@ riscv_precompiled_hdrs = \
 	insn_template.h \
 
 riscv_srcs = \
+	takum_glue.cc \
 	processor.cc \
 	execute.cc \
 	dts.cc \
@@ -1810,6 +1811,14 @@ riscv_insn_ext_p = \
 	pnclipup_h \
 	pnclipup_w \
 
+# Zvtakum (projeto Takum-RVV)
+riscv_insn_ext_zvtakum = \
+	vtadd_vv \
+	vtsub_vv \
+	vtmul_vv \
+	vtdot_vv \
+	vncvt_t_t \
+
 riscv_insn_list = \
 	$(riscv_insn_ext_i) \
 	$(riscv_insn_ext_c) \
@@ -1819,6 +1828,7 @@ riscv_insn_list = \
 	$(riscv_insn_ext_b) \
 	$(riscv_insn_ext_a) \
 	$(if $(HAVE_INT128),$(riscv_insn_ext_v),) \
+	$(if $(HAVE_INT128),$(riscv_insn_ext_zvtakum),) \
 	$(riscv_insn_ext_zvfofp4min) \
 	$(riscv_insn_ext_zvfofp8min) \
 	$(riscv_insn_ext_bf16) \
