@@ -29,3 +29,9 @@ demo: test dot
 	@echo "instrucoes executadas: $$(grep -c 'core   0: 0x' spike_test/trace.txt)"
 
 .PHONY: test integracao dot spike-test demo
+
+# Benchmark SpMV e GEMV (Fase 3) + geracao dos graficos. Uso: make spmv
+spmv: test_spmv.cpp takum_decoder.cpp takum_decoder.h takum_tipo.h avaliacao_takum.py
+	$(CXX) $(CXXFLAGS) test_spmv.cpp takum_decoder.cpp -lquadmath -lm -o test_spmv && ./test_spmv && python3 avaliacao_takum.py
+
+.PHONY: spmv

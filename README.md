@@ -17,7 +17,7 @@ Grupo: Rafael Estevão; Glaucia; Lucas. UFMG, AOC 2026/02.
 ## Requisitos
 - Linux ou WSL2 (Ubuntu). **Não compila com MSVC**, pois o código usa `__int128`.
 - `g++` (C++17), `gcc`, `make`, `git`, em arquitetura 64 bits.
-- <Python 3.x e bibliotecas, se avaliacao_takum.py usar matplotlib/numpy: liste aqui>
+- Python 3.x e bibliotecas (numpy, scipy, matplotlib).
 
 Instalação no Ubuntu/WSL:
 ```bash
@@ -77,8 +77,8 @@ long double para 7 integrais de teste, e a comparação entre soma ingênua e so
 | `docs/artigo/secao_arquitetura.tex` | Seção "Proposed Architecture" do artigo |
 | `docs/slides/` | Slides de arquitetura/ISA (`gen.py` gera o `.pptx`) |
 | `third_party/libtakum` | Submódulo, usado **somente como oráculo de teste** |
-| `riscv-isa-sim/` | <descrever: simulador e o que foi modificado> |
-| `avaliacao_takum.py` | <descrever: o que gera, como rodar> |
+| `riscv-isa-sim/` | Simulador funcional RISC-V (modificado para incluir instrucoes Zvtakum no espaco custom-1). |
+| `avaliacao_takum.py` | Gera os graficos de erro relativo e compara a SpMV Takum vs IEEE/OFP8 (rode `make spmv`). |
 | `docs/` | Slides, artigo IEEE e `DECISIONS.md` |
 
 ## Como usar a biblioteca
