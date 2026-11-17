@@ -1,0 +1,33 @@
+\subsection{ISA Instruction Count and CSR Overhead Analysis}
+\label{sec:isa_csr}
+
+Beyond numerical accuracy, extending the RISC-V Vector architecture (\texttt{RVV}) with \texttt{Zvtakum} directly impacts instruction density and pipeline control overhead in inner linear-algebra loops. We evaluate the static instruction count per strip-mined iteration of a dense dot-product / GEMV inner loop operating on narrow 8-bit and 16-bit formats.
+
+In standard \texttt{RVV} with IEEE 754 / OCP formats (\texttt{OFP8} or \texttt{FP16}), preventing immediate overflow during accumulation requires explicit widening arithmetic (\texttt{vfwmul.vv} and \texttt{vfwadd.wv}) coupled with dynamic scaling or narrowing conversion (\texttt{vfncvt.f.f.w}). Conversely, \texttt{Zvtakum} fuses element-wise multiplication and wide internal accumulation (64-bit significand) within \texttt{vtdot.vv}, while chained \texttt{vtmul.vv} + \texttt{vtadd.vv} operates natively at constant dynamic range ($\approx 10^{\pm 77}$).
+
+\begin{table}[htbp]
+\centering
+\caption{Inner-Loop Static Instruction Count and CSR Dependencies (Per Strip-Mined Iteration)}
+\label{tab:isa_comparison}
+\begin{tabular}{lcc}
+\hline
+\textbf{Metric / Feature} & \textbf{RVV + IEEE/OFP8} & \textbf{RVV + Zvtakum} \\
+\hline
+Strip-mining (\texttt{vsetvli}, ptrs) & 4 inst. & 4 inst. \\
+Vector loads (\texttt{vle8/16.v}) & 2 inst. & 2 inst. \\
+Compute \& accumulation & 2--3 inst. (widening) & 1 inst. (\texttt{vtdot.vv}) \\
+Post-loop narrowing / scale & 1--2 inst. & 0 inst. \\
+\textbf{Total inner-loop instructions} & \textbf{8--9 inst.} & \textbf{7 inst. (-22\%)} \\
+\hline
+Rounding CSR (\texttt{frm}) read & Required per op & \textbf{None} (single mode) \\
+Exception CSR (\texttt{fflags}) write & NV, DZ, OF, UF, NX & \textbf{None} (saturating) \\
+Register group (\texttt{EMUL}) & $2\times$ SEW & $1\times$ SEW \\
+\hline
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:isa_comparison} summarizes the architectural comparison. Two key microarchitectural advantages emerge:
+\begin{enumerate}
+    \item \textbf{Elimination of \texttt{frm} and \texttt{fflags} CSR Overhead:} Standard RISC-V floating-point instructions implicitly read the dynamic rounding mode from \texttt{frm} and update five exception flags (\texttt{NV}, \texttt{DZ}, \texttt{OF}, \texttt{UF}, \texttt{NX}) in \texttt{fflags} (aliased within \texttt{fcsr}). Maintaining precise CSR state introduces control hazards whenever \texttt{fcsr} is inspected or modified. Because Takum defines a single deterministic rounding mode and saturating bounds without sticky exception flags, \texttt{Zvtakum} instructions are completely decoupled from \texttt{fcsr}, \texttt{frm}, and \texttt{fflags}.
+    \item \textbf{Preservation of Vector Register Pressure:} Widening IEEE instructions (\texttt{vfwmul.vv}) double the effective element width ($2 \times \text{SEW}$), consuming twice as many physical vector registers per group ($\text{EMUL} = 2 \times \text{LMUL}$). By encapsulating the 64-bit significand accumulator inside the functional unit during \texttt{vtdot.vv}, \texttt{Zvtakum} maintains $\text{EMUL} = \text{LMUL}$.
+\end{enumerate}
