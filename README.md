@@ -86,6 +86,13 @@ make demo SPIKE=riscv-isa-sim/build/spike           # roteiro da demonstração 
 ```
 Os resultados da análise estão em `docs/ANALISE_ISA.md`.
 
+## Teste de clone limpo (antes de cada checkpoint)
+Depois de commitar, confirme que tudo funciona num clone novo, com submódulos:
+```bash
+scripts/teste_clone_limpo.sh                           # sem Spike
+SPIKE=riscv-isa-sim/build/spike scripts/teste_clone_limpo.sh   # com Spike
+```
+
 ## Integração contínua
 `.github/workflows/ci.yml` roda `make all` em um clone limpo (com submódulos) a cada *push* e *pull request*, e
 compila o Spike para rodar `make spike-test` e `make analise-isa`.
