@@ -1,5 +1,6 @@
 # Analise de contagem de instrucoes e CSRs: RVV/IEEE x Zvtakum (docs/ANALISE_ISA.md).
 #   make run    SPIKE=/caminho/para/spike    -> verifica os kernels e as medidas de CSR (codigo de saida 0 = OK)
+#   make report SPIKE=/caminho/para/spike    -> tabelas de contagem estatica e dinamica
 #   make controle SPIKE=/caminho/para/spike  -> controle negativo: kernel IEEE nao roda com FS=Off
 # Requer: g++, riscv64-unknown-elf-gcc/objdump/nm, python3 e um Spike compilado com este repositorio (docs/SPIKE.md).
 SPIKE ?= spike
@@ -33,6 +34,12 @@ controle: controle_fs_off.elf
 	   echo "CONTROLE FALHOU: o kernel IEEE terminou com FS=Off"; exit 1; \
 	 else echo "CONTROLE OK: o kernel IEEE nao roda com FS=Off (os kernels Takum rodam: make run)"; fi
 
+trace.txt: analise.elf
+	$(SPIKE) -l --log=$@ --isa=rv64gv $<
+
+report: analise.elf trace.txt
+	python3 contagem.py --elf analise.elf --trace trace.txt --objdump $(OBJDUMP) --nm $(NM)
+
 clean:
 	rm -f gera_dados_analise test_data_analise.h analise.elf controle_fs_off.elf trace.txt
-.PHONY: run controle clean
+.PHONY: run report controle clean
