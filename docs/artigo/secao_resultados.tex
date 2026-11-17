@@ -1,0 +1,31 @@
+\section{Results and Discussion}
+\label{sec:results}
+
+\subsection{Experimental Setup and Precision Reference}
+To evaluate the numerical behavior of the proposed \texttt{Zvtakum} extension on scientific and machine learning workloads, we implemented a Sparse Matrix-Vector Multiplication (SpMV) benchmark in Compressed Sparse Row (CSR) format, alongside a dense General Matrix-Vector Multiplication (GEMV) kernel. Unlike standard x86-64 \texttt{long double} (80-bit extended precision with a 64-bit significand), our ground-truth reference $y_{\text{ref}}$ is computed in IEEE 754 quadruple precision (\texttt{\_\_float128} via \texttt{libquadmath}, 113 significand bits).
+
+We compare Takum (\texttt{T8}, \texttt{T16}, \texttt{T32}) against IEEE 754 \texttt{FP32} and \texttt{FP16}, as well as Open Compute Project (OCP) 8-bit formats \texttt{OFP8 E4M3} (saturating at $\pm 448$) and \texttt{OFP8 E5M2} (range $\pm 57344$). To avoid division-by-near-zero distortion in relative error $|y - y_{\text{ref}}| / |y_{\text{ref}}|$, elements with $|y_{\text{ref}, i}| \le 10^{-12} \max_j |y_{\text{ref}, j}|$ are filtered out across 15 random seeds.
+
+\subsection{SpMV Accuracy: Narrow vs. Wide Dynamic Range}
+Figure~\ref{fig:spmv_cdf} shows the Cumulative Distribution Function (CDF) of the element-wise relative error for $200 \times 200$ sparse matrices ($d = 10\%$) under: (a) a narrow range $\mathcal{N}(0, 1)$, and (b) a wide dynamic range $\mathcal{N}(0, 1) \cdot 2^{\mathcal{U}(-18, 18)}$.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{grafico_cdf_spmv.png}
+    \caption{CDF of element-wise relative error in SpMV ($200 \times 200$, $d=10\%$, 15 seeds) under (a) narrow and (b) wide dynamic range.}
+    \label{fig:spmv_cdf}
+\end{figure}
+
+In the narrow regime (Fig.~\ref{fig:spmv_cdf}a), \texttt{Takum} with \texttt{vtdot.vv} achieves median relative errors of $7.44 \times 10^{-2}$ (\texttt{T8}), $2.63 \times 10^{-4}$ (\texttt{T16}), and $4.19 \times 10^{-9}$ (\texttt{T32}), outperforming standard chained \texttt{OFP8 E4M3} ($8.79 \times 10^{-2}$), \texttt{FP16} ($7.31 \times 10^{-4}$), and \texttt{FP32} ($8.68 \times 10^{-8}$) due to reduced accumulation rounding. In the wide dynamic range regime (Fig.~\ref{fig:spmv_cdf}b), \texttt{OFP8 E4M3}, \texttt{OFP8 E5M2}, and \texttt{FP16} suffer severe overflow and underflow, collapsing to a median relative error of $1.00 \times 10^{0}$ ($100\%$). Conversely, \texttt{T8} ($4.55 \times 10^{-1}$), \texttt{T16} ($1.77 \times 10^{-3}$), and \texttt{T32} ($2.81 \times 10^{-8}$) preserve numerical stability across the entire range ($\approx 10^{\pm 77}$).
+
+\subsection{Impact of Extended-Precision Accumulation (\texttt{vtdot.vv})}
+Figure~\ref{fig:dot_vs_chain} compares chained execution (\texttt{vtmul.vv} + \texttt{vtadd.vv}), strip-mined \texttt{vtdot.vv} ($\text{VLEN}=128$), and full \texttt{vtdot.vv} accumulation across SpMV ($256 \times 256$, $d=10\%$ and $20\%$) and a dense $128 \times 128$ ML layer (GEMV).
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{grafico_dot_vs_chain.png}
+    \caption{Median relative error comparing chained \texttt{vtmul+vtadd}, strip-mined \texttt{vtdot.vv} ($\text{VLEN}=128$), and full \texttt{vtdot.vv} accumulation.}
+    \label{fig:dot_vs_chain}
+\end{figure}
+
+In the dense $128 \times 128$ GEMV workload, \texttt{vtdot.vv} reaches median errors of $9.56 \times 10^{-2}$ (\texttt{T8}), $4.14 \times 10^{-4}$ (\texttt{T16}), and $6.13 \times 10^{-9}$ (\texttt{T32}), significantly lower than \texttt{OFP8 E4M3} ($1.81 \times 10^{-1}$), \texttt{FP16} ($1.55 \times 10^{-3}$), and \texttt{FP32} ($1.87 \times 10^{-7}$), confirming the benefit of the internal 64-bit significand accumulator.

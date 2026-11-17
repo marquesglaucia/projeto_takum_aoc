@@ -21,3 +21,6 @@ spike_test/test_data.h
 spike_test/test_spike.elf
 spike_test/trace.txt
 teste
+
+test_spmv
+*.csv
