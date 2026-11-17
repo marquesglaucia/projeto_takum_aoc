@@ -1,26 +1,39 @@
+# Spike compilado (veja docs/SPIKE.md)
 riscv-isa-sim/build/
 
-# Artefatos de build
-lib/
-test_takum
-test_integracao
-main
+# Executaveis de teste e artefatos de build (nunca versionar binarios)
+/lib/
+/test_takum
+/test_integracao
+/test_dot
+/test_spmv
+/main
+teste
 *.o
 *.a
+*.elf
+
+# Gerados pelos testes e pelas analises
+/dot_vectors.txt
+*.csv
+spike_test/gera_dados
+spike_test/test_data.h
+spike_test/trace.txt
+analise_isa/gera_dados_analise
+analise_isa/test_data_analise.h
+analise_isa/trace.txt
+
+# LaTeX (artigo)
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.synctex.gz
 
 # Python
 __pycache__/
 *.pyc
 
 # Editor
-.vscode/dot_vectors.txt
-test_dot
-test_integracao
-spike_test/gera_dados
-spike_test/test_data.h
-spike_test/test_spike.elf
-spike_test/trace.txt
-teste
-
-test_spmv
-*.csv
+.vscode/
