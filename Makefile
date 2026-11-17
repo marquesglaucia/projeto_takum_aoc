@@ -1,8 +1,22 @@
-# Uso: make test LIBTAKUM=/caminho/para/libtakum   (compare com a referencia oficial)
+# Projeto Takum-RVV (AOC 2026/02). Alvos principais:
+#   make all           tudo que NAO precisa do Spike: test, integracao, dot, spmv   (e o alvo padrao)
+#   make test          decodificacao/codificacao e + - * / contra a libtakum
+#   make integracao    integracao numerica em Takum x IEEE
+#   make dot           vtdot (takum_dot) contra __float128 e modelo Python exato
+#   make spmv          benchmark SpMV/GEMV (Fase 3) e graficos
+#   make spike-test    5 instrucoes Zvtakum no Spike      (precisa do Spike compilado: docs/SPIKE.md)
+#   make demo          demonstracao (test + dot + Spike)
+#   make clean         remove executaveis e arquivos gerados
+# libtakum e submodulo (usada so como oraculo de teste): git submodule update --init
 CXX=g++
 CXXFLAGS=-O2 -std=c++17 -Wall
-LIBTAKUM?=../libtakum
+LIBTAKUM?=third_party/libtakum
+.DEFAULT_GOAL := all
+
+all: test integracao dot spmv
+
 lib/libtakum.a:
+	@test -f $(LIBTAKUM)/takum.h || { echo "libtakum ausente em $(LIBTAKUM): rode 'git submodule update --init'"; exit 1; }
 	mkdir -p lib && for f in $(LIBTAKUM)/src/*.c; do gcc -O2 -std=c99 -c $$f -o lib/$$(basename $$f .c).o; done && ar rcs $@ lib/*.o
 test: lib/libtakum.a
 	$(CXX) $(CXXFLAGS) -I$(LIBTAKUM) test_takum.cpp takum_decoder.cpp lib/libtakum.a -lm -o test_takum && ./test_takum
@@ -35,3 +49,10 @@ spmv: test_spmv.cpp takum_decoder.cpp takum_decoder.h takum_tipo.h avaliacao_tak
 	$(CXX) $(CXXFLAGS) test_spmv.cpp takum_decoder.cpp -lquadmath -lm -o test_spmv && ./test_spmv && python3 avaliacao_takum.py
 
 .PHONY: spmv
+
+.PHONY: all clean
+
+# Remove o que o make gera (nao mexe nos graficos/figuras versionados)
+clean:
+	rm -rf lib test_takum test_integracao test_dot test_spmv *.csv dot_vectors.txt
+	$(MAKE) -C spike_test clean
