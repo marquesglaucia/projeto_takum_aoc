@@ -27,7 +27,8 @@ grep -q 'falhas: 0' make_all.log || falha "make all: sem 'falhas: 0'"
 ok "make all (test, integracao, dot, spmv)"
 
 if [ -n "${SPIKE:-}" ]; then
-  make spike-test SPIKE="$SPIKE" 2>&1 | grep -q 'Zvtakum OK' || falha "make spike-test"
+  make spike-test SPIKE="$SPIKE" >spike_test.log 2>&1 || { tail -20 spike_test.log; falha "make spike-test"; }
+  grep -q 'Zvtakum OK' spike_test.log || falha "make spike-test: sem 'Zvtakum OK'"
   ok "make spike-test"
   make analise-isa SPIKE="$SPIKE" >analise.log 2>&1 || { tail -20 analise.log; falha "make analise-isa"; }
   ok "make analise-isa"
@@ -35,7 +36,7 @@ else
   echo "[--] spike-test e analise-isa pulados (defina SPIKE=/caminho/do/spike)"
 fi
 
-sujeira="$(git status --porcelain --untracked-files=all | grep -v -E '^ M (grafico_.*\.png)$' | grep -v -E 'make_all.log|analise.log' || true)"
+sujeira="$(git status --porcelain --untracked-files=all | grep -v -E '^ M (grafico_.*\.png)$' | grep -v -E 'make_all.log|analise.log|spike_test.log' || true)"
 [ -z "$sujeira" ] || { echo "$sujeira"; falha "o build deixou arquivos nao ignorados (veja .gitignore)"; }
 ok "nenhum arquivo gerado fora do .gitignore (graficos regravados por 'make spmv' sao esperados)"
 echo "CLONE LIMPO: TUDO OK"
