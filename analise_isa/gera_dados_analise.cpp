@@ -73,7 +73,6 @@ int main() {
     }
     printf("enum { NROWS = %d, NNZ = %zu };\n", R, val.size());
     arru("ROWPTR", rp); arru("COL", col); arrf("VALF", val); arru("VALT", valt); arrf("XVF", xv); arru("XVT", xvt);
-    std::vector<float> dummy; 
     printf("static const double SPMV_REF[%d] = {", R); for (int i = 0; i < R; i++) printf("%s%a", i ? "," : "", yref[i]); printf("};\n");
     printf("static const double SPMV_ABS[%d] = {", R); for (int i = 0; i < R; i++) printf("%s%a", i ? "," : "", yabs[i]); printf("};\n");
     arru("SPMV_T32", yexp);
