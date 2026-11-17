@@ -1,0 +1,51 @@
+# Integracao continua do projeto Takum-RVV.
+#  - job "nucleo": clone limpo (com submodulos) + `make all` (sem Spike), rapido.
+#  - job "spike": compila o Spike com o Zvtakum, roda `make spike-test` e `make analise-isa` (lento; usa cache).
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  nucleo:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: sudo apt-get update && sudo apt-get install -y build-essential
+      - run: pip install -r requirements.txt
+      - run: make all
+
+  spike:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential device-tree-compiler libboost-regex-dev libboost-system-dev \
+                                  autoconf automake libtool gcc-riscv64-unknown-elf
+      - name: Cache do Spike
+        id: cache-spike
+        uses: actions/cache@v4
+        with:
+          path: riscv-isa-sim/build
+          key: spike-${{ runner.os }}-${{ hashFiles('riscv-isa-sim/**', 'takum_decoder.cpp', 'takum_decoder.h') }}
+      - name: Compilar o Spike
+        if: steps.cache-spike.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p riscv-isa-sim/build && cd riscv-isa-sim/build
+          ../configure --prefix=$PWD/install
+          make -j"$(nproc)"
+      - run: make spike-test SPIKE=riscv-isa-sim/build/spike
+      - run: make analise-isa SPIKE=riscv-isa-sim/build/spike
