@@ -1,6 +1,10 @@
 # Spike com Zvtakum: como compilar e testar
 
 ## O que foi alterado no `riscv-isa-sim`
+Base: Spike oficial no commit `7ab2efd` (2026-09-25, `riscv-software-src/riscv-isa-sim`). A lista abaixo foi conferida
+comparando o hash de **todos** os arquivos de `riscv-isa-sim/` com o da base: exatamente 14 arquivos diferem
+(5 novas instruções + 2 novos arquivos de ponte + 7 alterados), nenhum outro.
+
 | Arquivo | Alteração |
 |---|---|
 | `riscv/insns/vtadd_vv.h`, `vtsub_vv.h`, `vtmul_vv.h`, `vtdot_vv.h`, `vncvt_t_t.h` | **novos**: as 5 instruções |
@@ -9,12 +13,20 @@
 | `riscv/riscv.mk.in` | `takum_glue.cc` em `riscv_srcs`; lista `riscv_insn_ext_zvtakum` em `riscv_insn_list` (junto do V) |
 | `riscv/insn_template.cc` | `#include "takum_glue.h"` (uma vez, no topo) |
 | `disasm/disasm.cc` | disassembly das 5 instruções |
-| `riscv/opcodes.h` | removido o resquício `MATCH/MASK_VTSUB_VV` (conflitava com `encoding.h`) |
+| `riscv/opcodes.h` | removido o resquício `MATCH/MASK_VTSUB_VV` (conflitava com `encoding.h`); em relação à base só resta uma linha em branco |
 | `riscv/interactive.cc` | `socketif.h` antes de `decode_macros.h` (conserto para Boost ≥ 1.83, veja abaixo) |
+| `riscv/processor.h` | `#include <bitset>` (não ligado ao Takum; conserto de compilação, não documentado antes) |
 | removidos | `riscv/insns/vtadd_vv.cc`, `vtsub_vv.cc` (rascunhos), `riscv-isa-sim/takum_decoder.*` (cópia velha), `teste` (executável) |
 
 As instruções exigem `HAVE_INT128` (como o V) e o ISA `rv64gv` (ou `gcv`). Não há ainda uma *flag* de extensão `zvtakum`
 no `--isa`: as instruções valem sempre que o V está habilitado.
+
+Para refazer a conferência (precisa de rede):
+```bash
+git clone --filter=blob:none https://github.com/riscv-software-src/riscv-isa-sim.git /tmp/spike-oficial
+git -C /tmp/spike-oficial checkout 7ab2efd
+diff -rq /tmp/spike-oficial riscv-isa-sim -x .git -x build      # deve listar só os arquivos da tabela
+```
 
 ## Compilar o Spike
 ```bash
