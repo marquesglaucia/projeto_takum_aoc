@@ -5,6 +5,7 @@
 #   make dot           vtdot (takum_dot) contra __float128 e modelo Python exato
 #   make spmv          benchmark SpMV/GEMV (Fase 3) e graficos
 #   make spike-test    5 instrucoes Zvtakum no Spike      (precisa do Spike compilado: docs/SPIKE.md)
+#   make analise-isa   contagem de instrucoes/CSRs        (precisa do Spike: docs/ANALISE_ISA.md)
 #   make demo          demonstracao (test + dot + Spike)
 #   make clean         remove executaveis e arquivos gerados
 # libtakum e submodulo (usada so como oraculo de teste): git submodule update --init
@@ -50,9 +51,16 @@ spmv: test_spmv.cpp takum_decoder.cpp takum_decoder.h takum_tipo.h avaliacao_tak
 
 .PHONY: spmv
 
-.PHONY: all clean
+# Analise de contagem de instrucoes e CSRs (RVV/IEEE x Zvtakum). Uso: make analise-isa SPIKE=...
+analise-isa:
+	$(MAKE) -C analise_isa run SPIKE=$(abspath $(SPIKE))
+	$(MAKE) -C analise_isa controle SPIKE=$(abspath $(SPIKE))
+	$(MAKE) -C analise_isa report SPIKE=$(abspath $(SPIKE))
+
+.PHONY: all analise-isa clean
 
 # Remove o que o make gera (nao mexe nos graficos/figuras versionados)
 clean:
 	rm -rf lib test_takum test_integracao test_dot test_spmv *.csv dot_vectors.txt
 	$(MAKE) -C spike_test clean
+	$(MAKE) -C analise_isa clean
