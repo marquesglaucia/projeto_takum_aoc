@@ -23,7 +23,7 @@ Email: rafaelestevaoufmg.com, figueiredoglaucia56@gmail.com}
 \maketitle
 
 \begin{abstract}
-Low-bitwidth floating-point formats such as IEEE 754 half-precision (\texttt{FP16}) and Open Compute Project 8-bit formats (\texttt{OFP8 E4M3} and \texttt{E5M2}) are widely adopted to accelerate machine learning and scientific workloads. However, their narrow dynamic range makes them highly susceptible to numerical overflow and underflow when processing unscaled sparse matrices or wide-ranging gradients. Recently, Laslo proposed \emph{Takum}, a tapered-precision number system that guarantees a vast, bitwidth-independent dynamic range ($\approx 10^{\pm 77}$) across 8-, 16-, and 32-bit representations while concentrating precision near unity. In this paper, we present the design, implementation, and numerical evaluation of \texttt{Zvtakum}, a custom RISC-V Vector (\texttt{RVV}) instruction set extension supporting \texttt{T8}, \texttt{T16}, and \texttt{T32} formats. We design a unified 5-bit header decoder (\texttt{S, D, R}), implement core arithmetic and extended-precision dot-product instructions (\texttt{vtadd.vv}, \texttt{vtsub.vv}, \texttt{vtmul.vv}, \texttt{vtdot.vv}, and \texttt{vncvt.t.t.w}) in the \texttt{custom-1} opcode space, and evaluate them on Sparse Matrix-Vector Multiplication (SpMV) and dense General Matrix-Vector Multiplication (GEMV) workloads against a 128-bit quadruple-precision oracle (\texttt{\_\_float128}). Experimental results show that \texttt{Zvtakum} completely avoids the $100\%$ overflow/underflow failure exhibited by \texttt{OFP8} and \texttt{FP16} under wide dynamic ranges, while \texttt{vtdot.vv} reduces median relative error by $3\times$ to $7\times$ and eliminates pipeline dependencies on the \texttt{frm} and \texttt{fflags} CSRs.
+Low-bitwidth floating-point formats such as IEEE 754 half-precision (\texttt{FP16}) and Open Compute Project 8-bit formats (\texttt{OFP8 E4M3} and \texttt{E5M2}) are widely adopted to accelerate machine learning and scientific workloads. However, their narrow dynamic range makes them highly susceptible to numerical overflow and underflow when processing unscaled sparse matrices or wide-ranging gradients. Recently, Hunhold proposed \emph{Takum}, a tapered-precision number system that guarantees a vast dynamic range of $2^{\pm 255} \approx 10^{\pm 77}$ for bitwidths $N \ge 12$ (\texttt{T16} and \texttt{T32}) and $\approx 10^{\pm 72}$ in 8-bit precision (\texttt{T8}), while concentrating precision near unity. In this paper, we present the design, implementation, and numerical evaluation of \texttt{Zvtakum}, a custom RISC-V Vector (\texttt{RVV}) instruction set extension supporting linear \texttt{T8}, \texttt{T16}, and \texttt{T32} formats. We design a unified 5-bit header decoder (\texttt{S, D, R}) validated via numerical quadrature, implement core arithmetic and extended-precision dot-product instructions (\texttt{vtadd.vv}, \texttt{vtsub.vv}, \texttt{vtmul.vv}, \texttt{vtdot.vv}, and \texttt{vncvt.t.t}) in the \texttt{custom-1} opcode space inside the Spike simulator, and evaluate them on Sparse Matrix-Vector Multiplication (SpMV) and dense General Matrix-Vector Multiplication (GEMV) workloads against a 128-bit quadruple-precision oracle (\texttt{\_\_float128}). Experimental results show that \texttt{Zvtakum} completely avoids the $100\%$ overflow/underflow failure exhibited by \texttt{OFP8} and \texttt{FP16} under wide dynamic ranges, while \texttt{vtdot.vv} reduces median relative error by up to $2.7\times$ in strip-mined execution ($3\times$ to $7\times$ in full-row accumulation) and removes architectural dependencies on the \texttt{frm} and \texttt{fflags} CSRs.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -33,32 +33,39 @@ RISC-V, Vector Extension (RVV), Takum Arithmetic, Tapered Floating-Point, SpMV, 
 \section{Introduction}
 \label{sec:intro}
 
-The growing computational demands of deep neural networks and large-scale scientific simulations have driven a decisive shift toward reduced-precision arithmetic. Moving from 32-bit single-precision (\texttt{FP32}) to 16-bit (\texttt{FP16}) and 8-bit (\texttt{OFP8 E4M3} and \texttt{E5M2}) representations proportionally reduces memory bandwidth bottlenecks and increases vector throughput. Nevertheless, conventional IEEE 754 floating-point formats allocate a fixed number of bits to the exponent field, creating a rigid trade-off between dynamic range and significand precision. In 8-bit formats such as \texttt{OFP8 E4M3} (maximum value $448$) and 16-bit \texttt{FP16} (maximum normal value $65504$), computations involving wide dynamic ranges frequently suffer catastrophic overflow or underflow.
+The growing computational demands of deep neural networks and large-scale scientific simulations have driven a decisive shift toward reduced-precision arithmetic. Moving from 32-bit single-precision (\texttt{FP32}) to 16-bit (\texttt{FP16}) and 8-bit (\texttt{OFP8 E4M3} and \texttt{E5M2})~\cite{ocp_fp8} representations proportionally reduces memory bandwidth bottlenecks and increases vector throughput. Nevertheless, conventional IEEE 754 floating-point formats~\cite{ieee754} allocate a fixed number of bits to the exponent field, creating a rigid trade-off between dynamic range and significand precision. In 8-bit formats such as \texttt{OFP8 E4M3} (maximum normal value $448$) and 16-bit \texttt{FP16} (maximum normal value $65504$), computations involving wide dynamic ranges frequently suffer catastrophic overflow or underflow.
 
-To overcome these limitations, tapered-precision formats such as Posit and, more recently, \emph{Takum}~\cite{laslo2024takum} dynamically vary the length of the exponent encoding. Proposed by Laslo in 2024, Takum bounds the maximum dynamic range to roughly $e^{\pm 255} \approx 10^{\pm 77}$ regardless of the total bitwidth $N \ge 8$. Consequently, even an 8-bit Takum (\texttt{T8}) achieves a wider dynamic range than IEEE \texttt{FP32} ($\approx 10^{\pm 38}$) while retaining a shared 5-bit prefix structure (\texttt{S, D, R}) that simplifies hardware decoding across \texttt{T8}, \texttt{T16}, and \texttt{T32}.
+To overcome these limitations, tapered-precision formats such as Posit~\cite{gustafson2017posit} and, more recently, \emph{Takum}~\cite{hunhold2024takum} dynamically vary the length of the exponent encoding. Proposed by Hunhold in 2024, linear Takum bounds the characteristic field to at most 7 bits, achieving a dynamic range of $2^{\pm 255} \approx 10^{\pm 77}$ that remains constant for all bitwidths $N \ge 12$ (and reaches $\approx 8.8 \times 10^{71} \approx 10^{\pm 72}$ in \texttt{T8} due to 3-bit characteristic truncation). Consequently, even an 8-bit Takum (\texttt{T8}) achieves a vastly wider dynamic range than IEEE \texttt{FP32} ($\approx 10^{\pm 38}$) while retaining a shared 5-bit prefix structure (\texttt{S, D, R}) that simplifies hardware decoding across \texttt{T8}, \texttt{T16}, and \texttt{T32}~\cite{hunhold2025avx}.
 
 In this work, we bridge Takum arithmetic and vector processing by proposing \texttt{Zvtakum}, a RISC-V vector extension for linear Takum arithmetic. The main contributions of this work are:
 \begin{itemize}
-    \item A unified hardware-oriented C++ core and decoder for \texttt{T8}, \texttt{T16}, and \texttt{T32} validated against \texttt{libtakum} and numerical quadrature rules;
-    \item The specification and functional simulation of the \texttt{Zvtakum} ISA extension within the RISC-V \texttt{custom-1} opcode space, including an extended-precision vector dot product (\texttt{vtdot.vv});
-    \item A comprehensive numerical and architectural evaluation across CSR SpMV and dense ML GEMV workloads against an IEEE 754 quadruple-precision (\texttt{\_\_float128}) oracle, alongside an instruction count and CSR overhead analysis.
+    \item A unified C++ arithmetic core and 5-bit prefix decoder for \texttt{T8}, \texttt{T16}, and \texttt{T32} validated bit-by-bit against \texttt{libtakum} and composite numerical quadrature rules;
+    \item The specification and functional integration of the \texttt{Zvtakum} ISA extension within the RISC-V \texttt{custom-1} opcode space inside the Spike simulator, including an extended-precision vector dot product (\texttt{vtdot.vv});
+    \item A comprehensive numerical and architectural evaluation across CSR SpMV and dense ML GEMV workloads against an IEEE 754 quadruple-precision (\texttt{\_\_float128}) oracle, disentangling format and accumulator gains alongside an assembly instruction count and CSR dependency analysis.
 \end{itemize}
 
-\section{Background and Related Work}
+\section{Background}
 \label{sec:background}
 
-\subsection{IEEE 754, OCP FP8, and Tapered-Precision Arithmetic}
-In IEEE 754 floating-point representations, a real number is encoded using a sign bit $S$, a fixed-width biased exponent $E$, and a significand fraction $M$. Shrinking the word size to 16 or 8 bits severely restricts the exponent field. The Open Compute Project (OCP) defines two 8-bit variants~\cite{ocp_fp8}: \texttt{E4M3} (saturating at $\pm 448$) and \texttt{E5M2} (range $\pm 57344$). Both formats exhibit high quantization noise and rapid saturation when matrix entries span multiple orders of magnitude. Posit arithmetic~\cite{gustafson2017posit} introduced a variable-length unary regime field to provide higher precision near $1.0$, but its variable-length regime requires a full-word leading-zero/one detector before exponent extraction.
+\subsection{IEEE 754 and OCP FP8 Representations}
+In IEEE 754 floating-point arithmetic~\cite{ieee754}, a real number is encoded using a sign bit $S$, a fixed-width biased exponent $E$, and a significand fraction $M$. Shrinking the word size to 16 bits (\texttt{FP16}, 5 exponent bits) or 8 bits severely restricts the exponent range. The Open Compute Project (OCP) defines two 8-bit variants~\cite{ocp_fp8}: \texttt{E4M3} (4 exponent bits, 3 mantissa bits, saturating at $\pm 448$) and \texttt{E5M2} (5 exponent bits, 2 mantissa bits, range $\pm 57344$). Both formats exhibit high quantization noise and rapid saturation when matrix entries span multiple orders of magnitude.
 
 \subsection{The Linear Takum Format}
-Takum arithmetic~\cite{laslo2024takum} replaces the unbounded unary regime with a fixed 3-bit regime field $R$ combined with a direction bit $D$ and sign bit $S$. For an $n$-bit Takum (\texttt{T8}, \texttt{T16}, or \texttt{T32}), the first 5 bits $(S, D, R)$ completely determine the bitwidth $r$ of the characteristic field $C$:
+Takum arithmetic~\cite{hunhold2024takum} replaces fixed-width exponents with a 3-bit regime field $R$ combined with a direction bit $D$ and sign bit $S$. For an $n$-bit linear Takum (\texttt{T8}, \texttt{T16}, or \texttt{T32}), the first 5 bits $(S, D, R)$ completely determine the bitwidth $r \in [0, 7]$ of the characteristic field $C$:
 \begin{equation}
     r = \begin{cases} R, & \text{if } D = 1 \\ 7 - R, & \text{if } D = 0 \end{cases}
 \end{equation}
-The signed characteristic $c$ and the remaining $p = n - 5 - r$ mantissa bits $M$ yield a linear floating-point value $(-1)^S \cdot 2^c \cdot (1 + M / 2^p)$. Because only the first 5 bits must be inspected to locate $C$ and $M$, the decoder front-end is identical across \texttt{T8}, \texttt{T16}, and \texttt{T32}.
+The signed characteristic $c$ and the remaining $p = \max(0, n - 5 - r)$ mantissa bits $M$ yield a linear floating-point value $(-1)^S \cdot 2^c \cdot (1 + M / 2^p)$ for positive values ($S=0$) and its monotonic negation for $S=1$. Because $r \le 7$, any bitwidth $N \ge 12$ accommodates the full 5-bit header plus 7 characteristic bits, providing a constant dynamic range of $2^{\pm 255} \approx 10^{\pm 77}$ (while \texttt{T8} truncates characteristics with $r > 3$, spanning $\approx 10^{\pm 72}$).
 
 \subsection{RISC-V Vector Extension (RVV)}
-The RISC-V Vector Extension (\texttt{RVV 1.0})~\cite{riscv_v_spec} employs a vector-length agnostic programming model governed by \texttt{vtype} (which configures \texttt{SEW} and \texttt{LMUL}) and \texttt{vl} (active vector length). Application loops use \texttt{vsetvli} to strip-mine arbitrary-length vectors across different hardware vector register widths (\texttt{VLEN}).
+The RISC-V Vector Extension (\texttt{RVV 1.0})~\cite{riscv_v_spec} employs a vector-length agnostic programming model governed by \texttt{vtype} (which configures the Selected Element Width \texttt{SEW} and register grouping \texttt{LMUL}) and \texttt{vl} (active vector length). Application loops use \texttt{vsetvli} to strip-mine arbitrary-length vectors across hardware vector register widths (\texttt{VLEN}).
+
+\section{Related Work}
+\label{sec:related}
+
+Gustafson and Yonemoto~\cite{gustafson2017posit} introduced Posit arithmetic as a tapered-precision drop-in replacement for IEEE 754 floating-point numbers. While Posits offer higher accuracy near unity than IEEE floats of equal width, their variable-length unary regime can occupy the entire $n$-bit word. Consequently, Posit dynamic range varies drastically with bitwidth (remaining overly narrow at 8 bits), and hardware decoders must serialize regime leading-zero/one detection across all $n - 1$ bits before extracting the exponent and fraction.
+
+To address these hardware bottlenecks, Hunhold~\cite{hunhold2024takum} proposed Takum arithmetic in 2024, bounding the regime prefix to exactly 3 bits ($R$) plus a direction bit ($D$). Evaluations on linear systems and matrix workloads demonstrated that linear Takums match or exceed Posit accuracy while preventing overflow in 8- and 16-bit formats. Subsequently, Hunhold~\cite{hunhold2025avx} investigated SIMD ISA extensions for Takum arithmetic on fixed-width packed-SIMD architectures (Intel AVX-512 and Arm SVE), highlighting how the invariant 5-bit prefix $(S, D, R)$ enables a shared decoder front-end across 8-, 16-, 32-, and 64-bit lanes. Unlike packed SIMD extensions, our work integrates linear Takum arithmetic into the stateful, vector-length agnostic RISC-V Vector (\texttt{RVV}) architecture (\texttt{Zvtakum}), introducing a fused extended-precision reduction instruction (\texttt{vtdot.vv}) and evaluating strip-mined SpMV and GEMV kernels inside the Spike ISA simulator.
 
 \input{secao_arquitetura.tex}
 \input{secao_resultados.tex}
@@ -67,23 +74,26 @@ The RISC-V Vector Extension (\texttt{RVV 1.0})~\cite{riscv_v_spec} employs a vec
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper presented the design, implementation, and evaluation of \texttt{Zvtakum}, a custom RISC-V Vector (\texttt{RVV}) extension supporting 8-, 16-, and 32-bit linear Takum arithmetic. By exploiting Takum's invariant 5-bit prefix (\texttt{S, D, R}), our architecture unifies decoding across \texttt{T8}, \texttt{T16}, and \texttt{T32}, while the fused \texttt{vtdot.vv} instruction with an internal 64-bit significand accumulator mitigates intermediate rounding degradation without doubling vector register pressure.
+This paper presented the design, implementation, and evaluation of \texttt{Zvtakum}, a custom RISC-V Vector (\texttt{RVV}) extension supporting 8-, 16-, and 32-bit linear Takum arithmetic. By exploiting Takum's invariant 5-bit prefix (\texttt{S, D, R}), our functional model unifies decoding across \texttt{T8}, \texttt{T16}, and \texttt{T32} inside the Spike simulator, while the fused \texttt{vtdot.vv} instruction with an internal 64-bit significand accumulator mitigates intermediate rounding degradation without doubling vector register group pressure ($\texttt{EMUL} = \texttt{LMUL}$).
 
-Empirical evaluation against a 128-bit reference (\texttt{\_\_float128}) on CSR SpMV and dense GEMV workloads demonstrated that: (1) under wide dynamic ranges where \texttt{OFP8 E4M3}, \texttt{E5M2}, and \texttt{FP16} collapse to $100\%$ relative error, \texttt{T8}, \texttt{T16}, and \texttt{T32} maintain stability across $\approx 10^{\pm 77}$; and (2) \texttt{vtdot.vv} reduces median relative error by $3\times$ to $7\times$ over chained execution, outperforming \texttt{FP16} by nearly $4\times$ in dense 16-bit GEMV. Finally, \texttt{Zvtakum} reduces inner-loop instruction counts by $\approx 22\%$ while eliminating read/write dependencies on the \texttt{frm} and \texttt{fflags} CSRs.
+Empirical evaluation against a 128-bit quadruple-precision reference (\texttt{\_\_float128}) on numerical quadrature, CSR SpMV, and dense GEMV workloads demonstrated that: (1) under wide dynamic ranges where \texttt{OFP8 E4M3}, \texttt{E5M2}, and \texttt{FP16} collapse to $100\%$ relative error, \texttt{T8}, \texttt{T16}, and \texttt{T32} completely avoid overflow and underflow; and (2) \texttt{vtdot.vv} reduces median relative error by $3\times$ to $7\times$ in full-row accumulation and up to $2.7\times$ in hardware strip-mined execution ($\texttt{VLEN}=128$), outperforming \texttt{FP16} in 16-bit GEMV. Finally, \texttt{Zvtakum} eliminates the 5-instruction per-row reduction epilogue required by widening RVV loops and removes architectural dependencies on the \texttt{frm} and \texttt{fflags} CSRs.
 
 \begin{thebibliography}{9}
 
-\bibitem{laslo2024takum}
-L.~Laslo, ``Takum: A Novel Tapered Floating-Point Number System with Wide Dynamic Range,'' \emph{arXiv preprint arXiv:2404.18603}, 2024.
+\bibitem{hunhold2024takum}
+L.~Hunhold, ``Beating Posits at Their Own Game: Takum Arithmetic,'' in \emph{Next Generation Arithmetic (CoNGA 2024)}, Lecture Notes in Computer Science, vol.~14666. Cham: Springer, 2024, pp.~51--67.
+
+\bibitem{hunhold2025avx}
+L.~Hunhold, ``Streamlining SIMD ISA Extensions with Takum Arithmetic: A Case Study on Intel AVX-512 and Arm SVE,'' in \emph{Proc. 14th Int. Conf. Modern Circuits and Systems Technologies (MOCAST)}, IEEE, 2025.
 
 \bibitem{riscv_v_spec}
-RISC-V International, ``The RISC-V Instruction Set Manual, Volume I: Unprivileged ISA (Vector Extension Version 1.0),'' 2021.
+RISC-V International, ``The RISC-V Instruction Set Manual, Volume I: Unprivileged ISA (Vector Extension Version 1.0),'' 2021. [Online]. Available: \url{https://github.com/riscv/riscv-v-spec}
 
 \bibitem{ieee754}
-\emph{IEEE Standard for Floating-Point Arithmetic}, IEEE Std 754-2019, July 2019.
+\emph{IEEE Standard for Floating-Point Arithmetic}, IEEE Std 754-2019 (Revision of IEEE Std 754-2008), pp.~1--84, July 2019.
 
 \bibitem{ocp_fp8}
-P.~Micikevicius \emph{et al.}, ``OCP 8-bit Floating Point Specification (OFP8),'' Open Compute Project, 2023.
+P.~Micikevicius \emph{et al.}, ``OCP 8-bit Floating Point Specification (OFP8),'' Open Compute Project, Tech. Rep., 2023.
 
 \bibitem{gustafson2017posit}
 J.~L.~Gustafson and I.~T.~Yonemoto, ``Beating Floating Point at Its Own Game: Posit Arithmetic,'' \emph{Supercomputing Frontiers and Innovations}, vol.~4, no.~2, pp.~71--86, 2017.
