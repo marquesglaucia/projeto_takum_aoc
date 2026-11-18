@@ -65,7 +65,7 @@ The RISC-V Vector Extension (\texttt{RVV 1.0})~\cite{riscv_v_spec} employs a vec
 
 Gustafson and Yonemoto~\cite{gustafson2017posit} introduced Posit arithmetic as a tapered-precision drop-in replacement for IEEE 754 floating-point numbers. While Posits offer higher accuracy near unity than IEEE floats of equal width, their variable-length unary regime can occupy the entire $n$-bit word. Consequently, Posit dynamic range varies drastically with bitwidth (remaining overly narrow at 8 bits), and hardware decoders must serialize regime leading-zero/one detection across all $n - 1$ bits before extracting the exponent and fraction.
 
-To address these hardware bottlenecks, Hunhold~\cite{hunhold2024takum} proposed Takum arithmetic in 2024, bounding the regime prefix to exactly 3 bits ($R$) plus a direction bit ($D$). Evaluations on linear systems and matrix workloads demonstrated that linear Takums match or exceed Posit accuracy while preventing overflow in 8- and 16-bit formats. Subsequently, Hunhold~\cite{hunhold2025avx} investigated SIMD ISA extensions for Takum arithmetic on fixed-width packed-SIMD architectures (Intel AVX-512 and Arm SVE), highlighting how the invariant 5-bit prefix $(S, D, R)$ enables a shared decoder front-end across 8-, 16-, 32-, and 64-bit lanes. Unlike packed SIMD extensions, our work integrates linear Takum arithmetic into the stateful, vector-length agnostic RISC-V Vector (\texttt{RVV}) architecture (\texttt{Zvtakum}), introducing a fused extended-precision reduction instruction (\texttt{vtdot.vv}) and evaluating strip-mined SpMV and GEMV kernels inside the Spike ISA simulator.
+To address these hardware bottlenecks, Hunhold~\cite{hunhold2024takum} proposed Takum arithmetic in 2024, bounding the regime prefix to exactly 3 bits ($R$) plus a direction bit ($D$). Evaluations on linear systems and matrix workloads demonstrated that linear Takums match or exceed Posit accuracy while preventing overflow in 8- and 16-bit formats. Subsequently, Hunhold~\cite{hunhold2025avx} investigated SIMD ISA extensions for Takum arithmetic on fixed-width packed-SIMD architectures (Intel AVX10.2), highlighting how the invariant 5-bit prefix $(S, D, R)$ enables a shared decoder front-end across 8-, 16-, 32-, and 64-bit lanes. Unlike packed SIMD extensions, our work integrates linear Takum arithmetic into the stateful, vector-length agnostic RISC-V Vector (\texttt{RVV}) architecture (\texttt{Zvtakum}), introducing a fused extended-precision reduction instruction (\texttt{vtdot.vv}) and evaluating strip-mined SpMV and GEMV kernels inside the Spike ISA simulator.
 
 \input{secao_arquitetura.tex}
 \input{secao_resultados.tex}
@@ -81,10 +81,10 @@ Empirical evaluation against a 128-bit quadruple-precision reference (\texttt{\_
 \begin{thebibliography}{9}
 
 \bibitem{hunhold2024takum}
-L.~Hunhold, ``Beating Posits at Their Own Game: Takum Arithmetic,'' in \emph{Next Generation Arithmetic (CoNGA 2024)}, Lecture Notes in Computer Science, vol.~14666. Cham: Springer, 2024, pp.~51--67.
+L.~Hunhold, ``Beating Posits at Their Own Game: Takum Arithmetic,'' in \emph{Next Generation Arithmetic (CoNGA 2024)}, Lecture Notes in Computer Science, Springer Nature Switzerland, 2024, pp.~1--51.
 
 \bibitem{hunhold2025avx}
-L.~Hunhold, ``Streamlining SIMD ISA Extensions with Takum Arithmetic: A Case Study on Intel AVX-512 and Arm SVE,'' in \emph{Proc. 14th Int. Conf. Modern Circuits and Systems Technologies (MOCAST)}, IEEE, 2025.
+L.~Hunhold, ``Streamlining SIMD ISA Extensions with Takum Arithmetic: A Case Study on Intel AVX10.2,'' in \emph{Proc. 14th Int. Conf. Modern Circuits and Systems Technologies (MOCAST)}, June 2025, pp.~1--6.
 
 \bibitem{riscv_v_spec}
 RISC-V International, ``The RISC-V Instruction Set Manual, Volume I: Unprivileged ISA (Vector Extension Version 1.0),'' 2021. [Online]. Available: \url{https://github.com/riscv/riscv-v-spec}
