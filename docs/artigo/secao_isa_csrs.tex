@@ -1,44 +1,41 @@
 \subsection{ISA Instruction Count and CSR Dependency Analysis}
 \label{sec:isa_csr}
 
-To evaluate instruction density and architectural state overhead, Listing~1 compares the RISC-V assembly inner loop of a strip-mined dot product (as executed per row in GEMV and CSR SpMV) for \texttt{RVV + IEEE FP16} using widening multiply-accumulate (\texttt{vfwmacc.vv} into \texttt{FP32}) against \texttt{RVV + Zvtakum} using \texttt{vtdot.vv}.
+To evaluate instruction density and architectural state overhead, Fig.~\ref{fig:asm_loops} (Listing~1) compares the RISC-V assembly inner loop of a strip-mined dot product for \texttt{RVV + IEEE FP16} using widening multiply-accumulate (\texttt{vfwmacc.vv} into \texttt{FP32}) against \texttt{RVV + Zvtakum} using \texttt{vtdot.vv}.
 
 \begin{figure}[htbp]
-\footnotesize
+\scriptsize
 \begin{verbatim}
 # (a) Baseline RVV + IEEE FP16 (Widening to FP32)
-# Requires pre-loop accumulator zeroing and post-loop
-# horizontal vector reduction + narrowing per row:
-  vsetvli t0, x0, e32, m2, ta, ma  # Pre-loop: 2*SEW
-  vmv.v.i v4, 0                    # Zero FP32 vec acc
-1:vsetvli t0, a0, e16, m1, ta, ma  # 1. Strip length vl
-  vle16.v v1, (a1)                 # 2. Load x slice
-  vle16.v v2, (a2)                 # 3. Load y slice
-  vfwmacc.vv v4, v1, v2            # 4. Widening MAC
-  slli t1, t0, 1                   # 5. Byte stride
-  add a1, a1, t1                   # 6. Advance ptr_x
-  add a2, a2, t1                   # 7. Advance ptr_y
-  sub a0, a0, t0                   # 8. Decrement n
-  bnez a0, 1b                      # 9. Loop branch
-  # Post-loop epilogue (executed once per matrix row):
-  vsetvli t0, x0, e32, m2, ta, ma  # E1. Config 2*SEW
-  vmv.s.x v6, x0                   # E2. Zero scalar
-  vfredusum.vs v6, v4, v6          # E3. Tree reduction
-  vsetvli t0, x0, e16, m1, ta, ma  # E4. Config SEW
-  vfncvt.f.f.w v0, v6              # E5. Narrow to FP16
+  vsetvli t0, x0, e32, m2, ta, ma # Pre-loop: 2*SEW
+  vmv.v.i v4, 0                   # Zero FP32 vec acc
+1:vsetvli t0, a0, e16, m1, ta, ma # 1. Strip len vl
+  vle16.v v1, (a1)                # 2. Load x slice
+  vle16.v v2, (a2)                # 3. Load y slice
+  vfwmacc.vv v4, v1, v2           # 4. Widening MAC
+  slli t1, t0, 1                  # 5. Byte stride
+  add a1, a1, t1                  # 6. Advance ptr_x
+  add a2, a2, t1                  # 7. Advance ptr_y
+  sub a0, a0, t0                  # 8. Decrement n
+  bnez a0, 1b                     # 9. Loop branch
+  # Post-loop epilogue (executed once per row):
+  vsetvli t0, x0, e32, m2, ta, ma # E1. Config 2*SEW
+  vmv.s.x v6, x0                  # E2. Zero scalar
+  vfredusum.vs v6, v4, v6         # E3. Tree sum
+  vsetvli t0, x0, e16, m1, ta, ma # E4. Config SEW
+  vfncvt.f.f.w v0, v6             # E5. Narrow FP16
 
 # (b) Proposed RVV + Zvtakum (vtdot.vv)
-# Accumulates directly into scalar element v0[0]:
-1:vsetvli t0, a0, e16, m1, ta, ma  # 1. Strip length vl
-  vle16.v v1, (a1)                 # 2. Load x slice
-  vle16.v v2, (a2)                 # 3. Load y slice
-  vtdot.vv v0, v1, v2              # 4. Fused dot prod
-  slli t1, t0, 1                   # 5. Byte stride
-  add a1, a1, t1                   # 6. Advance ptr_x
-  add a2, a2, t1                   # 7. Advance ptr_y
-  sub a0, a0, t0                   # 8. Decrement n
-  bnez a0, 1b                      # 9. Loop branch
-  # Post-loop epilogue: 0 instructions (result in v0[0])
+1:vsetvli t0, a0, e16, m1, ta, ma # 1. Strip len vl
+  vle16.v v1, (a1)                # 2. Load x slice
+  vle16.v v2, (a2)                # 3. Load y slice
+  vtdot.vv v0, v1, v2             # 4. Fused dot
+  slli t1, t0, 1                  # 5. Byte stride
+  add a1, a1, t1                  # 6. Advance ptr_x
+  add a2, a2, t1                  # 7. Advance ptr_y
+  sub a0, a0, t0                  # 8. Decrement n
+  bnez a0, 1b                     # 9. Loop branch
+  # Post-loop epilogue: 0 inst. (result in v0[0])
 \end{verbatim}
 \caption{Listing 1: Strip-mined inner-loop assembly comparison between (a) standard RVV with widening \texttt{vfwmacc.vv} and (b) \texttt{Zvtakum} with \texttt{vtdot.vv}.}
 \label{fig:asm_loops}
@@ -48,6 +45,7 @@ To evaluate instruction density and architectural state overhead, Listing~1 comp
 \centering
 \caption{Instruction Count and Architectural State Comparison for a Strip-Mined Dot-Product Kernel}
 \label{tab:isa_comparison}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lcc}
 \hline
 \textbf{Architectural Metric} & \textbf{RVV + IEEE (\texttt{vfwmacc})} & \textbf{RVV + Zvtakum} \\
@@ -64,7 +62,8 @@ Rounding CSR (\texttt{frm}) dependency & Read per FP op & \textbf{None} (fixed R
 Exception CSR (\texttt{fflags}) update & NV, DZ, OF, UF, NX & \textbf{None} (saturating) \\
 Accumulator register group (\texttt{EMUL}) & $2\times \text{LMUL}$ (widened) & $1\times \text{LMUL}$ \\
 \hline
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 As detailed in Listing~1 and Table~\ref{tab:isa_comparison}, because standard RVV provides widening fused multiply-accumulate (\texttt{vfwmacc.vv}), the strip-mined loop body itself executes 8 instructions per strip in \texttt{T8} (no shift needed) or 9 instructions in \texttt{T16}/\texttt{T32} for both architectures. However, three structural differences arise:

@@ -52,7 +52,7 @@ for ax, dados_reg, titulo in [(axes[0], estreita, "(a) Narrow Dynamic Range: N(0
 axes[0].set_ylabel("Cumulative Distribution Function (CDF)")
 axes[0].legend(fontsize=8.5, loc="lower right")
 plt.tight_layout()
-plt.savefig("grafico_cdf_spmv.png", dpi=300)
+plt.savefig("grafico_cdf_spmv.png", dpi=300, bbox_inches="tight")
 plt.close()
 print("[OK] 'grafico_cdf_spmv.png' gerado com sucesso.")
 
